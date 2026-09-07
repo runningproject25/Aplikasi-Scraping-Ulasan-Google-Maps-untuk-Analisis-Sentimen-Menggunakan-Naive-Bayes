@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Analisis Sentimen — Saoenk Cobek{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+{% if session.get('logged_in') %}
+
+<!-- Sidebar -->
+<aside class="position-fixed top-0 start-0 h-100 d-flex flex-column shadow sidebar"
+       style="background: linear-gradient(180deg, #c0392b 0%, #922b21 100%);">
+
+  <div class="d-flex align-items-center gap-3 px-3 py-4 border-bottom border-white border-opacity-25">
+    <i class="fas fa-chart-pie text-white fs-4"></i>
+    <div>
+      <div class="text-white fw-bold" style="font-size:.95rem;">Restoran</div>
+      <div class="text-white-50" style="font-size:.75rem;">Analisis Sentimen</div>
+    </div>
+  </div>
+
+  <nav class="flex-grow-1 py-2 overflow-auto">
+    <ul class="list-unstyled px-2 mb-0">
+      <li>
+        <a class="nav-link d-flex align-items-center gap-3 px-3 py-2 rounded
+                  {% if active_page == 'dashboard' %}active bg-white bg-opacity-25 text-white fw-semibold
+                  {% else %}text-white-50{% endif %}"
+           href="{{ url_for('dashboard') }}">
+          <i class="fas fa-home"></i>Dashboard
+        </a>
+      </li>
+      <li>
+        <a class="nav-link d-flex align-items-center gap-3 px-3 py-2 rounded
+                  {% if active_page == 'scraping' %}active bg-white bg-opacity-25 text-white fw-semibold
+                  {% else %}text-white-50{% endif %}"
+           href="{{ url_for('scraping_page') }}">
+          <i class="fas fa-sync-alt"></i>Scraping Cabang
+        </a>
+      </li>
+      <li>
+        <a class="nav-link d-flex align-items-center gap-3 px-3 py-2 rounded
+                  {% if active_page == 'riwayat' %}active bg-white bg-opacity-25 text-white fw-semibold
+                  {% else %}text-white-50{% endif %}"
+           href="{{ url_for('riwayat_scraping') }}">
+          <i class="fas fa-history"></i>Hasil Analisis
+        </a>
+      </li>
+      {% if session.get('role') == 'admin' %}
+      <li>
+        <a class="nav-link d-flex align-items-center gap-3 px-3 py-2 rounded
+                  {% if active_page == 'kelola_admin' %}active bg-white bg-opacity-25 text-white fw-semibold
+                  {% else %}text-white-50{% endif %}"
+           href="{{ url_for('kelola_admin') }}">
+          <i class="fas fa-users-cog"></i>Kelola User
+        </a>
+      </li>
+      {% endif %}
+    </ul>
+  </nav>
+
+  <div class="px-3 py-3 border-top border-white border-opacity-25">
+    <a href="{{ url_for('logout') }}"
+       class="btn btn-outline-light btn-sm w-100 d-flex align-items-center justify-content-center gap-2">
+      <i class="fas fa-sign-out-alt"></i>Logout
+    </a>
+  </div>
+</aside>
+
+<!-- Main content -->
+<div class="main-wrapper d-flex flex-column min-vh-100">
+
+  <!-- Topbar -->
+  <div class="bg-white border-bottom px-4 py-2 d-flex align-items-center sticky-top shadow-sm">
+    <div class="ms-auto d-flex align-items-center gap-2">
+      <div class="rounded-circle d-flex align-items-center justify-content-center text-white"
+           style="width:34px;height:34px;background:linear-gradient(135deg,#c0392b,#922b21);">
+        <i class="fas fa-user-circle"></i>
+      </div>
+      <div style="line-height:1.2;">
+        <div class="fw-semibold" style="font-size:.85rem;">{{ session.get('admin_username', 'Admin') }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex-grow-1 p-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for cat, msg in messages %}
+        <div class="position-fixed top-0 start-50 translate-middle-x mt-3" style="z-index:9999;min-width:320px;">
+          <div class="alert alert-{{ cat }} show shadow-sm">
+            {{ msg }}
+          </div>
+        </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </div>
+
+</div>
+
+{% endif %}
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  setTimeout(function () {
+    var el = document.querySelector('.alert');
+    if (el) bootstrap.Alert.getOrCreateInstance(el).close();
+  }, 700);
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

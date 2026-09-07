@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% block title %}{{ sesi.nama_bulan }} {{ sesi.tahun }} — Saoenk Cobek{% endblock %}
+
+{% block content %}
+
+{% if sesi.status == 'selesai' %}
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1">{{ sesi.nama_bulan }} {{ sesi.tahun }}</h4>
+    <small class="text-muted">
+      <i class="fas fa-store me-1 text-brand"></i>
+      <strong>{{ sesi.cabang }}</strong>
+    </small>
+  </div>
+  <a href="{{ url_for('download_excel', session_id=sesi.id) }}" class="btn btn-success">
+    <i class="fas fa-file-excel me-2"></i>Download Excel
+  </a>
+</div>
+
+<!-- Kartu -->
+<div class="row g-3 mb-4">
+  <!-- Kartu total Ulasan -->
+  <div class="col-6 col-xl">
+    <div class="card p-3 h-100">
+      <div class="d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#fff0ee;">
+          <i class="fas fa-comment-dots" style="color:#e74c3c;font-size:1.3rem;"></i>
+        </div>
+        <div>
+          <div class="stat-label">TOTAL ULASAN</div>
+          <div class="stat-value text-dark">{{ sesi.jumlah_data}}</div>
+          <div class="stat-sub">{{ sesi.nama_bulan }} {{ sesi.tahun }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kartu Sentimen Positif -->
+  <div class="col-6 col-xl">
+    <div class="card p-3 h-100">
+      <div class="d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#eafaf1;">
+          <i class="fas fa-smile" style="color:#27ae60;font-size:1.6rem;"></i>
+        </div>
+        <div>
+          <div class="stat-label text-success">SENTIMEN POSITIF</div>
+          <div class="stat-value text-success">{{ sesi.jumlah_positif }}</div>
+          <div class="stat-sub">
+            {{ "%.1f"|format(sesi.jumlah_positif / sesi.jumlah_data * 100) if sesi.jumlah_data else '0.0' }}% dari total
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Kartu Sentimen Netral -->
+  <div class="col-6 col-xl">
+    <div class="card p-3 h-100">
+      <div class="d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#fef9e7;">
+          <i class="fas fa-meh" style="color:#f39c12;font-size:1.6rem;"></i>
+        </div>
+        <div>
+          <div class="stat-label text-warning">SENTIMEN NETRAL</div>
+          <div class="stat-value text-warning">{{ sesi.jumlah_netral }}</div>
+          <div class="stat-sub">
+            {{ "%.1f"|format(sesi.jumlah_netral / sesi.jumlah_data * 100) if sesi.jumlah_data else '0.0' }}% dari total
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Kartu Sentimen Negatif -->
+  <div class="col-6 col-xl">
+    <div class="card p-3 h-100">
+      <div class="d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#fdedec;">
+          <i class="fas fa-frown" style="color:#e74c3c;font-size:1.6rem;"></i>
+        </div>
+        <div>
+          <div class="stat-label text-danger">SENTIMEN NEGATIF</div>
+          <div class="stat-value text-danger">{{ sesi.jumlah_negatif }}</div>
+          <div class="stat-sub">
+            {{ "%.1f"|format(sesi.jumlah_negatif / sesi.jumlah_data * 100) if sesi.jumlah_data else '0.0' }}% dari total
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Kartu Akurasi Model -->
+  <div class="col-6 col-xl">
+    <div class="card p-3 h-100">
+      <div class="d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#f0eeff;">
+          <i class="fas fa-bullseye" style="color:#7c3aed;font-size:1.3rem;"></i>
+        </div>
+        <div>
+          <div class="stat-label" style="color:#7c3aed;">AKURASI MODEL</div>
+          <div class="stat-value" style="color:#7c3aed;">
+            {{ "%.1f"|format(sesi.akurasi * 100) if sesi.akurasi else '—' }}{% if sesi.akurasi %}%{% endif %}
+          </div>
+          <div class="stat-sub">Naive Bayes</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Grafik -->
+<div class="row g-3 mb-4">
+  <!-- Grafik Distribusi Sentimen -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header bg-white">
+        <span><i class="fas fa-chart-pie me-2 text-brand"></i>Distribusi Sentimen</span>
+      </div>
+      <div class="card-body">
+        <div style="position:relative;height:260px;">
+          <canvas id="chartPie"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Grafik Perbandingan Sentimen -->
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-header bg-white">
+        <span><i class="fas fa-chart-bar me-2 text-brand"></i>Perbandingan Sentimen</span>
+      </div>
+      <div class="card-body">
+        <div style="position:relative;height:260px;">
+          <canvas id="chartBar"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Aspek -->
+{% set _icon_color_aspek = {
+  'Makanan': {'icon': 'fa-utensils',       'color': '#e67e22'},
+  'Layanan': {'icon': 'fa-concierge-bell', 'color': '#2980b9'},
+  'Suasana': {'icon': 'fa-store',          'color': '#8e44ad'},
+} %}
+<div class="card mb-4">
+  <div class="card-header bg-white">
+    <span><i class="fas fa-layer-group me-2 text-brand"></i>Analisis Sentimen per Aspek</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      {% for aspek, sentimen in aspek_sentimen.items() %}
+      {% set total = sentimen['Positif'] + sentimen['Netral'] + sentimen['Negatif'] %}
+      {% set icon_color_aspek  = _icon_color_aspek[aspek] %}
+      {% set persentase_positifnya_aspek = (sentimen['Positif'] / total * 100) if total else 0 %}
+      {% set persentase_netralnya_aspek = (sentimen['Netral']  / total * 100) if total else 0 %}
+      {% set persentase_negatifnya_aspek = (sentimen['Negatif'] / total * 100) if total else 0 %}
+      <div class="col-md-4">
+        <div class="border rounded p-3 h-100" style="border-color:#e9ecef!important;">
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <div style="width:36px;height:36px;border-radius:10px;background:{{ icon_color_aspek.color }}22;display:flex;align-items:center;justify-content:center;">
+              <i class="fas {{ icon_color_aspek.icon }}" style="color:{{ icon_color_aspek.color }};font-size:.95rem;"></i>
+            </div>
+            <span class="fw-bold" style="color:{{ icon_color_aspek.color }};">{{ aspek }}</span>
+          </div>
+          <div class="row g-0 text-center mb-2">
+            <div class="col">
+              <div class="fw-bold text-success" style="font-size:1.2rem;">{{ "%.0f"|format(persentase_positifnya_aspek) }}%</div>
+              <div class="text-muted" style="font-size:.72rem;">Positif</div>
+              <div class="text-success" style="font-size:.75rem;">{{ sentimen['Positif'] }} ulasan</div>
+            </div>
+            <div class="col border-start border-end">
+              <div class="fw-bold text-warning" style="font-size:1.2rem;">{{ "%.0f"|format(persentase_netralnya_aspek) }}%</div>
+              <div class="text-muted" style="font-size:.72rem;">Netral</div>
+              <div class="text-warning" style="font-size:.75rem;">{{ sentimen['Netral'] }} ulasan</div>
+            </div>
+            <div class="col">
+              <div class="fw-bold text-danger" style="font-size:1.2rem;">{{ "%.0f"|format(persentase_negatifnya_aspek) }}%</div>
+              <div class="text-muted" style="font-size:.72rem;">Negatif</div>
+              <div class="text-danger" style="font-size:.75rem;">{{ sentimen['Negatif'] }} ulasan</div>
+            </div>
+          </div>
+          <div class="progress mb-2" style="height:6px;border-radius:4px;overflow:hidden;">
+            <div class="progress-bar bg-success" style="width:{{ persentase_positifnya_aspek }}%;"></div>
+            <div class="progress-bar bg-warning" style="width:{{ persentase_netralnya_aspek }}%;"></div>
+            <div class="progress-bar bg-danger"  style="width:{{ persentase_negatifnya_aspek }}%;"></div>
+          </div>
+          <div class="text-muted" style="font-size:.75rem;">total terdeteksi: <strong>{{ total }}</strong> ulasan</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Tabel komentar -->
+<div class="card">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="fas fa-comments me-2 text-brand"></i>Detail Ulasan</span>
+    <div class="d-flex gap-2 flex-wrap">
+      <input id="cariKomentar" type="text" class="form-control form-control-sm"
+             placeholder="Cari komentar..." style="width:200px;">
+      <select id="filterSentimen" class="form-select form-select-sm" style="width:auto;">
+        <option value="">Semua Sentimen</option>
+        <option value="Positif">Positif</option>
+        <option value="Netral">Netral</option>
+        <option value="Negatif">Negatif</option>
+      </select>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle" id="tblKomentar">
+        <thead class="table-light">
+          <tr>
+            <th style="width:160px">Cabang</th>
+            <th>Komentar</th>
+            <th class="text-center" style="width:90px">Rating</th>
+            <th class="text-center" style="width:100px">Sentimen</th>
+            <th class="text-center" style="width:90px">Confidence</th>
+            <th class="text-center" style="width:120px">Aspek</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for k in komentar_list %}
+          <tr data-cabang="{{ k.cabang }}" data-sentimen="{{ k.sentimen }}" data-komentar="{{ (k.komentar or '')|lower }}">
+            <td class="small text-muted">{{ k.cabang.replace('Saoenk Cobek ','') }}</td>
+            <td class="small">{{ k.komentar or '—' }}</td>
+            <td class="text-center">
+              {% if k.rating %}{% for i in range(k.rating) %}⭐{% endfor %}{% endif %}
+            </td>
+            <td class="text-center">
+              <span class="badge badge-{{ k.sentimen.lower() }}">{{ k.sentimen }}</span>
+            </td>
+            <td class="text-center small">
+              {% if k.confidence %}
+                {{ "%.0f"|format(k.confidence * 100) }}%
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-center">
+              {% if k.aspek_list %}
+                {% for aspek in k.aspek_list %}
+                  <span class="badge badge-{{ aspek.lower() }}">{{ aspek }}</span>
+                {% endfor %}
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1">{{ sesi.nama_bulan }} {{ sesi.tahun }}</h4>
+    <small class="text-muted">
+      <i class="fas fa-store me-1 text-brand"></i>
+      <strong>{{ sesi.cabang }}</strong>
+    </small>
+  </div>
+</div>
+<div class="card text-center py-5">
+  <div class="card-body">
+    <i class="fas fa-brain fa-3x text-success mb-3"></i>
+    <h5 class="fw-bold mb-2">Data siap dianalisis</h5>
+    <p class="text-muted mb-4">{{ sesi.jumlah_data }} ulasan telah berhasil di-scraping. Klik tombol di bawah untuk menjalankan analisis sentimen.</p>
+    <button id="btnAnalisis" class="btn btn-success px-4" onclick="mulaiAnalisis()">
+      <i class="fas fa-brain me-2"></i>Analisis Sentimen
+    </button>
+    <div id="analisisInfo" class="mt-3 text-muted d-none">
+      <div class="spinner-border spinner-border-sm me-2"></div>Sedang menganalisis, harap tunggu...
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if sesi.status != 'selesai' %}
+<script>
+function mulaiAnalisis() {
+  document.getElementById('btnAnalisis').disabled = true;
+  document.getElementById('analisisInfo').classList.remove('d-none');
+  fetch("{{ url_for('mulai_analisis_sesi', id_sesi_scraping=sesi.id) }}", { method: 'POST' })
+    .then(() => {
+      const poll = setInterval(() => {
+        fetch("{{ url_for('status_analisis') }}")
+          .then(r => r.json())
+          .then(data => {
+            if (data.status === 'selesai') {
+              clearInterval(poll);
+              location.href = "{{ url_for('detail_sesi', session_id=sesi.id) }}";
+            } else if (data.status === 'gagal') {
+              clearInterval(poll);
+              document.getElementById('analisisInfo').textContent = 'Analisis gagal: ' + data.pesan;
+            }
+          });
+      }, 2000);
+    });
+}
+</script>
+{% endif %}
+<script>
+new Chart(document.getElementById('chartPie'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Positif', 'Netral', 'Negatif'],
+    datasets: [{ 
+      data: [{{ sesi.jumlah_positif }}, {{ sesi.jumlah_netral }}, {{ sesi.jumlah_negatif }}], 
+      backgroundColor: ['#27ae60', '#f39c12', '#e74c3c']}]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false, cutout: '60%',
+    plugins: {
+      legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', padding: 16, font: { size: 11 } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('chartBar'), {
+  type: 'bar',
+  data: {
+    labels: ['Positif', 'Netral', 'Negatif'],
+    datasets: [{
+      data: [{{ sesi.jumlah_positif }}, {{ sesi.jumlah_netral }}, {{ sesi.jumlah_negatif }}],
+      backgroundColor: ['#27ae60', '#f39c12', '#e74c3c']
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false }
+    }
+  }
+});
+
+function filterTabel() {
+  const pilihan_sentimen = document.getElementById('filterSentimen').value;
+  const cari             = document.getElementById('cariKomentar').value.toLowerCase().trim();
+
+  document.querySelectorAll('#tblKomentar tbody tr').forEach(tr => {
+    const tampil = (!pilihan_sentimen || tr.dataset.sentimen === pilihan_sentimen)
+                && (!cari || tr.dataset.komentar.includes(cari));
+    tr.style.display = tampil ? '' : 'none';
+  });
+}
+
+document.getElementById('filterSentimen').addEventListener('change', filterTabel);
+document.getElementById('cariKomentar').addEventListener('input', filterTabel);
+</script>
+{% endblock %}

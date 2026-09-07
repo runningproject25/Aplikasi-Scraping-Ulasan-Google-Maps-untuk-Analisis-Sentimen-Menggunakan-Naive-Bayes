@@ -1,0 +1,33 @@
+:root { --sidebar-w: 240px; }
+
+.sidebar      { width: var(--sidebar-w); z-index: 100; }
+.main-wrapper { margin-left: var(--sidebar-w); }
+
+.card { border: none; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.07); }
+
+.btn-merah       { background: #c0392b; border-color: #c0392b; color: #fff; }
+.btn-merah:hover { background: #a93226; border-color: #a93226; color: #fff; }
+
+.text-brand    { color: #c0392b !important; }
+.card-header   { border-radius: 12px 12px 0 0 !important; font-weight: 600; }
+.stat-icon {
+  width: 52px; height: 52px; min-width: 52px;
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+.stat-label {
+  font-size: .68rem; font-weight: 700; letter-spacing: .04em;
+  color: #888; text-transform: uppercase; margin-bottom: 2px;
+}
+.stat-value { font-size: 1.6rem; font-weight: 700; line-height: 1.15; }
+.stat-sub   { font-size: .75rem; color: #999; margin-top: 2px; }
+.badge-positif  { background-color: #27ae60; color: #fff; }
+.badge-netral   { background-color: #f39c12; color: #fff; }
+.badge-negatif  { background-color: #e74c3c; color: #fff; }
+.badge-makanan  { background-color: #e67e22; color: #fff; }
+.badge-layanan  { background-color: #2980b9; color: #fff; }
+.badge-suasana  { background-color: #8e44ad; color: #fff; }
+.stat-positif  { border-left: 4px solid #27ae60; }
+.stat-netral   { border-left: 4px solid #f39c12; }
+.stat-negatif  { border-left: 4px solid #e74c3c; }
+.stat-total    { border-left: 4px solid #3498db; }

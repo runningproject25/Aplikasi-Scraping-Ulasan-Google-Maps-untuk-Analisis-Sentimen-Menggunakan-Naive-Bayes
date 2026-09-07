@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block title %}Scraping Cabang — Saoenk Cobek{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+
+    <!-- ── Card Form ─────────────────────────────────────────────────────── -->
+    <div id="card-form" class="card shadow-sm {% if id_sesi_scraping %}d-none{% endif %}">
+      <div class="card-header text-white" style="background:#c0392b;">
+        <i class="fas fa-sync-alt me-2"></i>Scraping Cabang
+      </div>
+      <div class="card-body p-4">
+
+        <div class="d-flex align-items-center gap-3 p-3 bg-light rounded mb-4">
+          <i class="fas fa-calendar-alt fa-2x" style="color:#c0392b;"></i>
+          <div>
+            <div class="fw-bold fs-5">{{ NAMA_BULAN[bulan_sekarang] }} {{ tahun_sekarang }}</div>
+            <div class="text-muted small">Pilih cabang yang ingin di-scraping.</div>
+          </div>
+        </div>
+
+        <form id="form-scraping" >
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Pilih Cabang</label>
+            <select name="cabang" class="form-select form-select-lg" required>
+              <option value="" disabled selected>— Pilih cabang —</option>
+              {% for key, info in BRANCHES.items() %}
+              <option value="{{ key }}">{{ info.nama }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <button type="submit" id="btn-mulai" class="btn btn-merah w-100 py-2">
+            <i class="fas fa-play me-2"></i>Mulai Scraping
+          </button>
+        </form>
+
+      </div>
+    </div>
+
+    <!-- ── Card Progress ─────────────────────────────────────────────────── -->
+    <div id="card-progress" class="card shadow-sm {% if not id_sesi_scraping %}d-none{% endif %}">
+      <div class="card-header bg-warning text-dark fw-semibold" id="progress-cabang">
+        {{ sesi.cabang if sesi else '' }}
+      </div>
+      <div class="card-body p-4">
+
+        <div class="mb-3">
+          <div class="d-flex justify-content-between mb-1">
+            <span class="fw-semibold" id="label-status"></span>
+            <span id="label-progress">0%</span>
+          </div>
+          <div class="progress" style="height:20px;">
+            <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated"
+                 role="progressbar" style="width:0%"></div>
+          </div>
+        </div>
+
+        <div class="mt-3" id="info-data"></div>
+
+        <div class="mt-4 d-none" id="btn-selesai"></div>
+        <div class="mt-4 d-none" id="btn-gagal">
+          <div class="p-3 rounded bg-danger bg-opacity-10 text-danger mb-3" id="pesan-error"></div>
+          <a href="{{ url_for('scraping_page') }}" class="btn btn-secondary w-100">Coba Lagi</a>
+        </div>
+
+        <div class="mt-3 d-none" id="btn-hentikan">
+          <button class="btn btn-outline-danger w-100" onclick="konfirmasiHentikan()">
+            <i class="fas fa-stop-circle me-2"></i>Hentikan Proses
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+<span id="sesi-data" data-id-sesi-scraping="{{ id_sesi_scraping or '' }}" hidden></span>
+
+<!-- Modal Konfirmasi Hentikan -->
+<div class="modal fade" id="modalHentikan" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-body text-center p-4">
+        <div class="mb-3">
+          <div class="rounded-circle bg-danger bg-opacity-10 d-inline-flex align-items-center justify-content-center"
+               style="width:64px;height:64px;">
+            <i class="fas fa-stop-circle fa-xl text-danger"></i>
+          </div>
+        </div>
+        <h5 class="fw-bold mb-1">Hentikan Scraping?</h5>
+        <p class="text-muted small mb-4">Data yang sudah terkumpul akan hilang.</p>
+        <div class="d-flex gap-2 justify-content-center">
+          <button class="btn btn-secondary px-4" data-bs-dismiss="modal">Batal</button>
+          <button class="btn btn-danger px-4" id="btn-konfirmasi-hentikan">
+            <i class="fas fa-stop-circle me-2"></i>Ya, Hentikan
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let sessionId = null;
+
+// ── Elemen DOM ────────────────────────────────────────────────────────────────
+const labelStatus   = document.getElementById('label-status');
+const labelProgress = document.getElementById('label-progress');
+const progressBar   = document.getElementById('progress-bar');
+const infoData      = document.getElementById('info-data');
+const btnHentikan   = document.getElementById('btn-hentikan');
+const btnSelesai    = document.getElementById('btn-selesai');
+const btnGagal      = document.getElementById('btn-gagal');
+
+const LABEL = {
+  berjalan:       'Sedang berjalan...',
+  scraping:       'Scraping Google Maps...',
+  saving:         'Menyimpan ke database...',
+  terkumpul:      'Data Terkumpul!',
+  tidak_tersedia: 'Tidak ada ulasan baru.',
+  dihentikan:     'Proses dihentikan.',
+  gagal:          'Gagal!',
+};
+
+const TOMBOL_HASIL =
+  `<a href="/riwayat" class="btn btn-merah w-100">
+     <i class="fas fa-history me-2"></i>Lihat Riwayat Scraping
+   </a>`;
+
+// ── Helper UI ─────────────────────────────────────────────────────────────────
+function tampilkanCardProgress(namaCabang) {
+  document.getElementById('progress-cabang').textContent = namaCabang;
+  document.getElementById('card-form').classList.add('d-none');
+  document.getElementById('card-progress').classList.remove('d-none');
+}
+
+function setProgress(persentase) {
+  progressBar.style.width   = persentase + '%';
+  labelProgress.textContent = persentase + '%';
+}
+
+function tampilSelesai(infoHtml) {
+  setProgress(100);
+  btnHentikan.classList.add('d-none');
+  infoData.innerHTML   = infoHtml;
+  btnSelesai.innerHTML = TOMBOL_HASIL;
+  btnSelesai.classList.remove('d-none');
+}
+
+function tampilGagal(pesan) {
+  btnHentikan.classList.add('d-none');
+  btnGagal.classList.remove('d-none');
+  document.getElementById('pesan-error').textContent = pesan;
+}
+
+// ── Polling ───────────────────────────────────────────────────────────────────
+function poll() {
+  fetch(`/scraping/status/${sessionId}`)
+    .then(r => r.json())
+    .then(data => {
+      const status = data.db_status || data.status;
+      setProgress(data.progress || 0);
+      labelStatus.textContent = LABEL[data.status] || data.status;
+
+      if (data.progress > 0) btnHentikan.classList.remove('d-none');
+
+      if (status === 'terkumpul') {
+        tampilSelesai(data.jumlah_data
+          ? `<i class="fas fa-check-circle text-primary me-1"></i>
+             <strong>${data.jumlah_data}</strong> komentar tersimpan.`
+          : '');
+        return;
+      }
+      if (status === 'tidak_tersedia') {
+        tampilSelesai(`<i class="fas fa-info-circle text-warning me-1"></i>
+           Tidak ada ulasan baru ditemukan untuk periode ini.`);
+        return;
+      }
+      if (status === 'gagal') {
+        tampilGagal('Error: ' + (data.pesan || 'Terjadi kesalahan.'));
+        return;
+      }
+      if (data.status === 'dihentikan') {
+        tampilGagal('Proses dihentikan oleh admin.');
+        return;
+      }
+      setTimeout(poll, 3000);
+    })
+    .catch(() => setTimeout(poll, 5000));
+}
+
+// ── Tombol hentikan ───────────────────────────────────────────────────────────
+function konfirmasiHentikan() {
+  const modal = new bootstrap.Modal(document.getElementById('modalHentikan'));
+  modal.show();
+
+  document.getElementById('btn-konfirmasi-hentikan').onclick = function() {
+    modal.hide();
+    btnHentikan.innerHTML =
+      '<button class="btn btn-outline-danger w-100" disabled>'
+      + '<span class="spinner-border spinner-border-sm me-2"></span>Menghentikan...</button>';
+    fetch(`/scraping/hentikan/${sessionId}`, { method: 'POST' })
+      .then(() => { labelStatus.textContent = 'Menghentikan...'; });
+  };
+}
+
+// ── Inisialisasi: cek sesi aktif ──────────────────────────────────────────────
+const serverSesiId = document.getElementById('sesi-data').dataset.idSesiScraping;
+if (serverSesiId) {
+  sessionId = parseInt(serverSesiId, 10);
+  poll();
+}
+
+// ── Submit form via AJAX ──────────────────────────────────────────────────────
+document.getElementById('form-scraping').addEventListener('submit', function(e) {
+  e.preventDefault();
+
+  fetch('{{ url_for("mulai_scraping") }}', {
+    method: 'POST',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    body: new FormData(this),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.ok) {
+      alert(data.pesan || 'Gagal memulai scraping.');
+      return;
+    }
+    sessionId = data.id_sesi_scraping;
+    tampilkanCardProgress(data.nama_cabang);
+    poll();
+  })
+  .catch(() => { alert('Gagal menghubungi server.'); });
+});
+</script>
+{% endblock %}

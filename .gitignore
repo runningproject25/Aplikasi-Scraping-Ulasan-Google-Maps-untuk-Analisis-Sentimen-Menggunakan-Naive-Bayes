@@ -1,0 +1,27 @@
+# Virtual environment Python (ukuran sangat besar, tidak boleh di-push)
+venv/
+env/
+ENV/
+.venv/
+
+# File cache Python (dihasilkan otomatis saat aplikasi dijalankan)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# File konfigurasi rahasia & API keys
+.env
+.env.local
+
+# File database lokal (opsional: abaikan jika tidak ingin data mentah ikut ke repo)
+*.sqlite3
+*.db
+
+# Folder konfigurasi code editor
+.vscode/
+.idea/
+
+# Log sistem & file temporary OS
+*.log
+.DS_Store
+Thumbs.db

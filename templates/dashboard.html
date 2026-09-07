@@ -1,0 +1,561 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Saoenk Cobek Sentimen{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1">Dashboard Analisis Sentimen</h4>
+    <small class="text-muted">
+      <i class="fas fa-store me-1 text-brand"></i>
+      Restoran — Semua Cabang
+    </small>
+  </div>
+  <a class="btn btn-merah" href="{{ url_for('scraping_page') }}">
+    <i class="fas fa-sync-alt me-2"></i>Scraping Cabang
+  </a>
+</div>
+
+<!-- Kartu -->
+<div class="row g-3 mb-4">
+  <!-- Kartu Total Ulasan -->
+  <div class="col-6 col-xl">
+    <div class="card p-3 h-100">
+      <div class="d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#fff0ee;">
+          <i class="fas fa-comment-dots" style="color:#e74c3c;font-size:1.3rem;"></i>
+        </div>
+        <div>
+          <div class="stat-label">TOTAL ULASAN</div>
+          <div class="stat-value text-dark">{{ sesi.jumlah_data or 0 }}</div>
+          <div class="stat-sub">Semua Cabang</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kartu Sentimen Positif -->
+  <div class="col-6 col-xl">
+    <div class="card p-3 h-100">
+      <div class="d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#eafaf1;">
+          <i class="fas fa-smile" style="color:#27ae60;font-size:1.6rem;"></i>
+        </div>
+        <div>
+          <div class="stat-label text-success">SENTIMEN POSITIF</div>
+          <div class="stat-value text-success">{{ sesi.jumlah_positif or 0 }}</div>
+          <div class="stat-sub">
+            {% if sesi.jumlah_data %}{{ "%.1f"|format(sesi.jumlah_positif / sesi.jumlah_data * 100) }}% dari total{% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kartu Sentimen Netral -->
+  <div class="col-6 col-xl">
+    <div class="card p-3 h-100">
+      <div class="d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#fef9e7;">
+          <i class="fas fa-meh" style="color:#f39c12;font-size:1.6rem;"></i>
+        </div>
+        <div>
+          <div class="stat-label text-warning">SENTIMEN NETRAL</div>
+          <div class="stat-value text-warning">{{ sesi.jumlah_netral or 0 }}</div>
+          <div class="stat-sub">
+            {% if sesi.jumlah_data %}{{ "%.1f"|format(sesi.jumlah_netral / sesi.jumlah_data * 100) }}% dari total{% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kartu Sentimen Negatif -->
+  <div class="col-6 col-xl">
+    <div class="card p-3 h-100">
+      <div class="d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#fdedec;">
+          <i class="fas fa-frown" style="color:#e74c3c;font-size:1.6rem;"></i>
+        </div>
+        <div>
+          <div class="stat-label text-danger">SENTIMEN NEGATIF</div>
+          <div class="stat-value text-danger">{{ sesi.jumlah_negatif or 0 }}</div>
+          <div class="stat-sub">
+            {% if sesi.jumlah_data %}{{ "%.1f"|format(sesi.jumlah_negatif / sesi.jumlah_data * 100) }}% dari total{% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kartu Akurasi Model -->
+  <div class="col-6 col-xl">
+    <div class="card p-3 h-100">
+      <div class="d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#f0eeff;">
+          <i class="fas fa-bullseye" style="color:#7c3aed;font-size:1.3rem;"></i>
+        </div>
+        <div>
+          <div class="stat-label" style="color:#7c3aed;">AKURASI MODEL</div>
+          <div class="stat-value" style="color:#7c3aed;">
+            {% if sesi.akurasi %}{{ "%.1f"|format(sesi.akurasi * 100) }}%{% else %}—{% endif %}
+          </div>
+          <div class="stat-sub">
+            {% if sesi.akurasi %}
+              Naive Bayes
+            {% else %}
+              Belum dianalisis
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Grafik -->
+<div class="row g-3 mb-4">
+  <!-- Grafik Distribusi Sentimen -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header bg-white">
+        <span><i class="fas fa-chart-pie me-2 text-brand"></i>Distribusi Sentimen</span>
+      </div>
+      <div class="card-body">
+        <div style="position:relative;height:220px;">
+          <canvas id="chartPie"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Grafik Perbandingan Sentimen per Cabang -->
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-header bg-white">
+        <span><i class="fas fa-store me-2 text-brand"></i>Perbandingan Sentimen per Cabang</span>
+      </div>
+      <div class="card-body">
+        <div style="position:relative;height:220px;">
+          <canvas id="chartCabang"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Aspek -->
+{% set _icon_color_aspek = {
+  'Makanan': {'icon': 'fa-utensils',       'color': '#e67e22'},
+  'Layanan': {'icon': 'fa-concierge-bell', 'color': '#2980b9'},
+  'Suasana': {'icon': 'fa-store',          'color': '#8e44ad'},
+} %}
+<div class="card mb-4">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="fas fa-layer-group me-2 text-brand"></i>Analisis Sentimen per Aspek</span>
+    <select id="pilihBulanAspek" class="form-select form-select-sm" style="width:auto;font-size:.82rem;">
+      <option value="">Semua Bulan</option>
+      {% for bln in daftar_bulan %}
+      <option value="{{ bln }}">{{ bln }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      {% for aspek, sentimen in aspek_data["Semua Bulan"].items() %}
+      {% set total = sentimen['Positif'] + sentimen['Netral'] + sentimen['Negatif'] %}
+      {% set icon_color_aspek = _icon_color_aspek[aspek] %}
+      {% set persentase_positifnya_aspek = (sentimen['Positif'] / total * 100) if total else 0 %}
+      {% set persentase_netralnya_aspek  = (sentimen['Netral']  / total * 100) if total else 0 %}
+      {% set persentase_negatifnya_aspek = (sentimen['Negatif'] / total * 100) if total else 0 %}
+      {% set key = aspek | lower %}
+      <div class="col-md-4">
+        <div class="border rounded p-3 h-100" style="border-color:#e9ecef!important;">
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <div style="width:36px;height:36px;border-radius:10px;background:{{ icon_color_aspek.color }}22;display:flex;align-items:center;justify-content:center;">
+              <i class="fas {{ icon_color_aspek.icon }}" style="color:{{ icon_color_aspek.color }};font-size:.95rem;"></i>
+            </div>
+            <span class="fw-bold" style="color:{{ icon_color_aspek.color }};">{{ aspek }}</span>
+          </div>
+          <div class="row g-0 text-center mb-2">
+            <div class="col">
+              <div class="fw-bold text-success" id="aspek-{{ key }}-pos-pct" style="font-size:1.2rem;">{{ "%.0f"|format(persentase_positifnya_aspek) }}%</div>
+              <div class="text-muted" style="font-size:.72rem;">Positif</div>
+              <div class="text-success" id="aspek-{{ key }}-pos-count" style="font-size:.75rem;">{{ sentimen['Positif'] }} ulasan</div>
+            </div>
+            <div class="col border-start border-end">
+              <div class="fw-bold text-warning" id="aspek-{{ key }}-net-pct" style="font-size:1.2rem;">{{ "%.0f"|format(persentase_netralnya_aspek) }}%</div>
+              <div class="text-muted" style="font-size:.72rem;">Netral</div>
+              <div class="text-warning" id="aspek-{{ key }}-net-count" style="font-size:.75rem;">{{ sentimen['Netral'] }} ulasan</div>
+            </div>
+            <div class="col">
+              <div class="fw-bold text-danger" id="aspek-{{ key }}-neg-pct" style="font-size:1.2rem;">{{ "%.0f"|format(persentase_negatifnya_aspek) }}%</div>
+              <div class="text-muted" style="font-size:.72rem;">Negatif</div>
+              <div class="text-danger" id="aspek-{{ key }}-neg-count" style="font-size:.75rem;">{{ sentimen['Negatif'] }} ulasan</div>
+            </div>
+          </div>
+          <div class="progress mb-2" style="height:6px;border-radius:4px;overflow:hidden;">
+            <div class="progress-bar bg-success" id="aspek-{{ key }}-pos-bar" style="width:{{ persentase_positifnya_aspek }}%;"></div>
+            <div class="progress-bar bg-warning" id="aspek-{{ key }}-net-bar" style="width:{{ persentase_netralnya_aspek }}%;"></div>
+            <div class="progress-bar bg-danger"  id="aspek-{{ key }}-neg-bar" style="width:{{ persentase_negatifnya_aspek }}%;"></div>
+          </div>
+          <div class="text-muted" style="font-size:.75rem;">total terdeteksi: <strong id="aspek-{{ key }}-total">{{ total }}</strong> ulasan</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Tren Sentimen Bulan ke Bulan -->
+{% if data_sent_tiap_bln_dari_cab_tertentu %}
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span><i class="fas fa-chart-line me-2 text-brand"></i>Tren Sentimen Bulan ke Bulan</span>
+        <select id="pilihCabangTren" class="form-select form-select-sm" style="width:auto;font-size:.82rem;">
+          <option value="">Semua Cabang</option>
+          {% for cab in data_sent_tiap_bln_dari_cab_tertentu if cab != 'Semua Cabang' %}
+          <option value="{{ cab }}">{{ cab.replace('Saoenk Cobek ', '') }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="card-body">
+        <div style="position:relative;height:260px;">
+          <canvas id="chartTren"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Word Cloud + Mini Riwayat -->
+<div class="row g-3">
+
+  {% if wordcloud_all %}
+  <div class="col-md-5">
+    <div class="card h-100">
+      <div class="card-header bg-white py-2">
+        <span class="fw-semibold" style="font-size:.9rem;">
+          <i class="fas fa-cloud me-1 text-muted"></i>Top Kata
+        </span>
+      </div>
+      <div class="card-body p-2">
+        <div class="row g-2">
+          <div class="col-6">
+            <div class="text-center mb-1" style="font-size:.75rem;color:#27ae60;font-weight:600;">
+              <i class="fas fa-smile me-1"></i>Positif
+            </div>
+            <canvas id="topKataPositif" style="display:block;width:100%;height:160px;"></canvas>
+          </div>
+          <div class="col-6">
+            <div class="text-center mb-1" style="font-size:.75rem;color:#e74c3c;font-weight:600;">
+              <i class="fas fa-frown me-1"></i>Negatif
+            </div>
+            <canvas id="topKataNegatif" style="display:block;width:100%;height:160px;"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="col-md-7">
+    <div class="card h-100">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
+        <span class="fw-semibold" style="font-size:.9rem;">
+          <i class="fas fa-history me-2 text-brand"></i>Hasil Analisis
+        </span>
+      </div>
+      <div class="card-body p-0">
+        {% if riwayat_terakhir %}
+        <div class="table-responsive">
+          <table class="table table-hover table-sm mb-0 align-middle" style="font-size:.82rem;">
+            <thead class="table-light">
+              <tr>
+                <th>#</th>
+                <th>Periode</th>
+                <th>Cabang</th>
+                <th class="text-center">Scraping</th>
+                <th class="text-center">Analisis</th>
+                <th class="text-center">Total</th>
+                <th class="text-center text-success">Pos</th>
+                <th class="text-center text-warning">Net</th>
+                <th class="text-center text-danger">Neg</th>
+                <th class="text-center">Akurasi</th>
+                <th class="text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in riwayat_terakhir %}
+              <tr>
+                <td class="text-muted">{{ loop.index }}</td>
+                <td class="fw-semibold">{{ s.nama_bulan }} {{ s.tahun }}</td>
+                <td>{{ s.cabang.replace('Saoenk Cobek ','') }}</td>
+                <td class="text-center">
+                  {% if s.status == 'berjalan' %}
+                    <span class="badge bg-warning text-dark" style="font-size:.7rem;">Berjalan</span>
+                  {% elif s.status in ('terkumpul','sedang_analisis','selesai') %}
+                    <span class="badge bg-success" style="font-size:.7rem;">Terkumpul</span>
+                  {% elif s.status == 'tidak_tersedia' %}
+                    <span class="badge bg-warning text-dark" style="font-size:.7rem;">Tidak Tersedia</span>
+                  {% else %}
+                    <span class="badge bg-danger" style="font-size:.7rem;">Gagal</span>
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  {% if s.status == 'selesai' %}
+                    <span class="badge bg-success" style="font-size:.7rem;">Selesai</span>
+                  {% elif s.status == 'sedang_analisis' %}
+                    <span class="badge bg-info text-dark" style="font-size:.7rem;">Berjalan</span>
+                  {% else %}
+                    <span class="badge bg-secondary" style="font-size:.7rem;">Belum</span>
+                  {% endif %}
+                </td>
+                <td class="text-center">{{ s.jumlah_data or '—' }}</td>
+                <td class="text-center text-success fw-semibold">{{ s.jumlah_positif or '—' }}</td>
+                <td class="text-center text-warning fw-semibold">{{ s.jumlah_netral or '—' }}</td>
+                <td class="text-center text-danger fw-semibold">{{ s.jumlah_negatif or '—' }}</td>
+                <td class="text-center">
+                  {% if s.akurasi %}
+                    <span class="badge {% if s.akurasi >= 0.8 %}bg-success{% elif s.akurasi >= 0.6 %}bg-warning text-dark{% else %}bg-danger{% endif %}" style="font-size:.7rem;">
+                      {{ "%.1f"|format(s.akurasi * 100) }}%
+                    </span>
+                  {% else %}—{% endif %}
+                </td>
+                <td class="text-center">
+                  {% if s.status == 'selesai' %}
+                    <a href="{{ url_for('detail_sesi', session_id=s.id) }}" class="btn btn-sm btn-outline-primary py-0 px-1" title="Lihat detail">
+                      <i class="fas fa-eye" style="font-size:.75rem;"></i>
+                    </a>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="px-3 py-2 border-top text-end">
+          <a href="{{ url_for('riwayat_scraping') }}" class="text-danger text-decoration-none" style="font-size:.82rem;">
+            <i class="fas fa-arrow-right me-1"></i>Lihat Semua Riwayat
+          </a>
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+          <i class="fas fa-database fa-2x mb-2 opacity-25"></i>
+          <p class="mb-0 small">Belum ada riwayat scraping.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+
+{% if data_sent_tiap_bln_dari_cab_tertentu %}
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script>Chart.register(ChartDataLabels);</script>
+{% endif %}
+
+<script>
+const _daftarBulan  = {{ daftar_bulan  | tojson }};
+const _wordcloudAll = {{ wordcloud_all  | tojson }};
+const _aspekDataAll = {{ aspek_data     | tojson }};
+
+document.getElementById('pilihBulanAspek').addEventListener('change', function () {
+  const bulan = this.value || 'Semua Bulan';
+  const data  = _aspekDataAll[bulan];
+  ['Makanan', 'Layanan', 'Suasana'].forEach(aspek => {
+    const s     = data[aspek];
+    const total = s.Positif + s.Netral + s.Negatif;
+    const key   = aspek.toLowerCase();
+    const pPos  = total ? +(s.Positif / total * 100).toFixed(0) : 0;
+    const pNet  = total ? +(s.Netral  / total * 100).toFixed(0) : 0;
+    const pNeg  = total ? +(s.Negatif / total * 100).toFixed(0) : 0;
+    document.getElementById(`aspek-${key}-pos-pct`).textContent   = pPos + '%';
+    document.getElementById(`aspek-${key}-net-pct`).textContent   = pNet + '%';
+    document.getElementById(`aspek-${key}-neg-pct`).textContent   = pNeg + '%';
+    document.getElementById(`aspek-${key}-pos-count`).textContent = s.Positif + ' ulasan';
+    document.getElementById(`aspek-${key}-net-count`).textContent = s.Netral  + ' ulasan';
+    document.getElementById(`aspek-${key}-neg-count`).textContent = s.Negatif + ' ulasan';
+    document.getElementById(`aspek-${key}-pos-bar`).style.width   = pPos + '%';
+    document.getElementById(`aspek-${key}-net-bar`).style.width   = pNet + '%';
+    document.getElementById(`aspek-${key}-neg-bar`).style.width   = pNeg + '%';
+    document.getElementById(`aspek-${key}-total`).textContent     = total;
+  });
+});
+function _isiDropdownBulan(elId, defaultLabel) {
+  const sel = document.getElementById(elId);
+  if (!sel) return;
+  _daftarBulan.forEach(lbl => {
+    const opt = document.createElement('option');
+    opt.value = lbl;
+    opt.textContent = lbl;
+    if (lbl === defaultLabel) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+new Chart(document.getElementById('chartPie'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Positif', 'Netral', 'Negatif'],
+    datasets: [{
+      data: [{{ sesi.jumlah_positif or 0 }}, {{ sesi.jumlah_netral or 0 }}, {{ sesi.jumlah_negatif or 0 }}],
+      backgroundColor: ['#27ae60', '#f39c12', '#e74c3c']}]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false, cutout: '60%',
+    plugins: {
+      legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', padding: 16, font: { size: 11 } } },
+      datalabels: { display: false }
+    }
+  }
+});
+
+const cabangData  = {{ data_sentimen_tiap_cabang | tojson }};
+const cabangNames = Object.keys(cabangData);
+new Chart(document.getElementById('chartCabang'), {
+  type: 'bar',
+  data: {
+    labels: cabangNames.map(c => c.replace('Saoenk Cobek ', '')),
+    datasets: [
+      { label: 'Positif', data: cabangNames.map(c => cabangData[c].Positif), backgroundColor: '#27ae60' },
+      { label: 'Netral',  data: cabangNames.map(c => cabangData[c].Netral),  backgroundColor: '#f39c12' },
+      { label: 'Negatif', data: cabangNames.map(c => cabangData[c].Negatif), backgroundColor: '#e74c3c' },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', padding: 16, font: { size: 11 } } },
+      datalabels: { display: false }
+    },
+    scales: {
+      x: { grid: { display: false } },
+      y: { beginAtZero: true, ticks: { stepSize: 1 } }
+    }
+  }
+});
+</script>
+
+{% if data_sent_tiap_bln_dari_cab_tertentu %}
+<script>
+
+const trenCabang = {{ data_sent_tiap_bln_dari_cab_tertentu | tojson }};
+const allLabels  = Object.keys(trenCabang['Semua Cabang']);
+function cabToList(key) {
+  return allLabels.map(lbl => ({ label: lbl, ...(trenCabang[key]?.[lbl] || {positif:0, netral:0, negatif:0}) }));
+}
+let activeTrenData = cabToList('Semua Cabang');
+
+function hitungPct(data) {
+  return [
+    data.map(d => { const t = d.positif+d.netral+d.negatif; return t ? +(d.positif/t*100).toFixed(1) : 0; }),
+    data.map(d => { const t = d.positif+d.netral+d.negatif; return t ? +(d.netral /t*100).toFixed(1) : 0; }),
+    data.map(d => { const t = d.positif+d.netral+d.negatif; return t ? +(d.negatif/t*100).toFixed(1) : 0; }),
+  ];
+}
+
+const [pctPos, pctNet, pctNeg] = hitungPct(activeTrenData);
+
+const chartTren = new Chart(document.getElementById('chartTren'), {
+  type: 'bar',
+  data: {
+    labels: allLabels,
+    datasets: [
+      { label: 'Positif', data: pctPos, backgroundColor: '#27ae60', stack: 'sentimen' },
+      { label: 'Netral',  data: pctNet, backgroundColor: '#f39c12', stack: 'sentimen' },
+      { label: 'Negatif', data: pctNeg, backgroundColor: '#e74c3c', stack: 'sentimen' },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          usePointStyle: true, pointStyle: 'rect', padding: 20, font: { size: 13 },
+          generateLabels: () => {
+            const tPos = activeTrenData.reduce((s, d) => s + d.positif, 0);
+            const tNet = activeTrenData.reduce((s, d) => s + d.netral,  0);
+            const tNeg = activeTrenData.reduce((s, d) => s + d.negatif, 0);
+            const grand = tPos + tNet + tNeg;
+            return [
+              { text: `Positif — ${tPos} ulasan (${grand ? (tPos/grand*100).toFixed(1) : 0}%)`, fillStyle: '#27ae60', strokeStyle: '#27ae60', pointStyle: 'rect', datasetIndex: 0 },
+              { text: `Netral — ${tNet} ulasan (${grand ? (tNet/grand*100).toFixed(1) : 0}%)`,  fillStyle: '#f39c12', strokeStyle: '#f39c12', pointStyle: 'rect', datasetIndex: 1 },
+              { text: `Negatif — ${tNeg} ulasan (${grand ? (tNeg/grand*100).toFixed(1) : 0}%)`, fillStyle: '#e74c3c', strokeStyle: '#e74c3c', pointStyle: 'rect', datasetIndex: 2 },
+            ];
+          }
+        }
+      },
+      datalabels: { display: false },
+      tooltip: { enabled: false }
+    },
+    scales: {
+      x: { stacked: true, grid: { display: false }, border: { display: false } },
+      y: {
+        stacked: true, min: 0, max: 100,
+        grid: { color: 'rgba(0,0,0,.06)' }, border: { display: false },
+        title: { display: true, text: 'Proporsi Sentimen (%)', font: { size: 11 }, color: '#888' },
+        ticks: { callback: v => v + '%', stepSize: 25 },
+      },
+    },
+    barPercentage: 0.55, categoryPercentage: 0.7,
+  }
+});
+
+document.getElementById('pilihCabangTren').addEventListener('change', function () {
+  activeTrenData = cabToList(this.value || 'Semua Cabang');
+  const [p, n, neg] = hitungPct(activeTrenData);
+  chartTren.data.datasets[0].data = p;
+  chartTren.data.datasets[1].data = n;
+  chartTren.data.datasets[2].data = neg;
+  chartTren.update();
+});
+</script>
+{% endif %}
+
+{% if wordcloud_all %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.1.1/wordcloud2.min.js"></script>
+<script>
+function buatWordCloud(canvasId, data, warna) {
+  if (!data || !data.length) return;
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width  = rect.width  || canvas.offsetWidth  || 200;
+  canvas.height = rect.height || canvas.offsetHeight || 160;
+  const globalMax = data[0]?.[1] || 1;
+  const shadesHijau = ['#27ae60','#2ecc71','#1a8a45','#58d68d','#1e8449'];
+  const shadesMerah = ['#e74c3c','#c0392b','#f1948a','#cb4335','#e55039'];
+  WordCloud(canvas, {
+    list          : data,
+    gridSize      : Math.max(4, Math.round(canvas.width / 40)),
+    weightFactor  : size => Math.max(8, (size / globalMax) * (canvas.width / 5)),
+    fontFamily    : "'Segoe UI', sans-serif",
+    fontWeight    : 'bold',
+    color         : () => { const s = warna === 'hijau' ? shadesHijau : shadesMerah; return s[Math.floor(Math.random() * s.length)]; },
+    backgroundColor: '#ffffff',
+    rotateRatio   : 0, shrinkToFit: true, drawOutOfBound: false, minSize: 7,
+  });
+}
+
+function updateWordCloud() {
+  const topKata = _wordcloudAll || { positif: [], negatif: [] };
+  buatWordCloud('topKataPositif', topKata.positif, 'hijau');
+  buatWordCloud('topKataNegatif', topKata.negatif, 'merah');
+}
+
+setTimeout(updateWordCloud, 300);
+</script>
+{% endif %}
+
+{% endblock %}

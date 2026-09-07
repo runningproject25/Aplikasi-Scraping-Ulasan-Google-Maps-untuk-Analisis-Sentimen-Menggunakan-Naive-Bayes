@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}Hasil Analisis — Restoran Sentimen{% endblock %}
+{% block page_title %}Hasil Analisis{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-0">Hasil Analisis</h4>
+    <small class="text-muted">Semua sesi scraping dan analisis sentimen</small>
+  </div>
+</div>
+
+{% if ada_running %}
+<div class="alert alert-info d-flex align-items-center gap-2 mb-4">
+  <div class="spinner-border spinner-border-sm text-info" role="status"></div>
+  <span>Proses scraping sedang berjalan. Halaman akan otomatis diperbarui.</span>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header bg-white">
+    <i class="fas fa-history me-2 text-danger"></i>Semua Sesi Scraping
+  </div>
+  <div class="card-body p-0">
+    {% if sesi_list %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>Periode</th>
+            <th>Cabang</th>
+            <th class="text-center">Scraping</th>
+            <th class="text-center">Analisis</th>
+            <th class="text-center">Total Data</th>
+            <th class="text-center text-success">Positif</th>
+            <th class="text-center text-warning">Netral</th>
+            <th class="text-center text-danger">Negatif</th>
+            <th class="text-center">Akurasi</th>
+            <th>Tanggal Scraping</th>
+            <th class="text-center">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in sesi_list %}
+          <tr>
+            <td class="text-muted">{{ loop.index }}</td>
+            <td class="fw-semibold">{{ s.nama_bulan }} {{ s.tahun }}</td>
+            <td>{{ s.cabang or '—' }}</td>
+
+            <!-- Status Scraping -->
+            <td class="text-center">
+              {% if s.status == 'berjalan' %}
+                <span class="badge bg-warning text-dark">
+                  <span class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem;"></span>
+                  Berjalan...
+                </span>
+              {% elif s.status in ('terkumpul', 'sedang_analisis', 'selesai') %}
+                <span class="badge bg-success">Terkumpul</span>
+              {% elif s.status == 'tidak_tersedia' %}
+                <span class="badge bg-warning text-dark">Tidak Tersedia</span>
+              {% else %}
+                <span class="badge bg-danger">Gagal</span>
+              {% endif %}
+            </td>
+
+            <!-- Status Analisis -->
+            <td class="text-center">
+              {% if s.status == 'selesai' %}
+                <span class="badge bg-success">Selesai</span>
+              {% elif s.status == 'sedang_analisis' %}
+                <span class="badge bg-info text-dark">
+                  <span class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem;"></span>
+                  Berjalan...
+                </span>
+              {% else %}
+                <span class="badge bg-secondary">Belum</span>
+              {% endif %}
+            </td>
+
+            <td class="text-center">{{ s.jumlah_data or '—' }}</td>
+            <td class="text-center text-success fw-semibold">{{ s.jumlah_positif or '—' }}</td>
+            <td class="text-center text-warning fw-semibold">{{ s.jumlah_netral or '—' }}</td>
+            <td class="text-center text-danger fw-semibold">{{ s.jumlah_negatif or '—' }}</td>
+            <td class="text-center">
+              {% if s.akurasi %}
+                <span class="badge {% if s.akurasi >= 0.8 %}bg-success{% elif s.akurasi >= 0.6 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                  {{ "%.1f"|format(s.akurasi * 100) }}%
+                </span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-muted small">{{ s.dibuat_pada.strftime('%d %b %Y %H:%M') if s.dibuat_pada else '—' }}</td>
+            <td class="text-center">
+              {% if s.status == 'berjalan' %}
+                <a href="{{ url_for('monitoring', id_sesi_scraping=s.id) }}" class="btn btn-sm btn-outline-warning me-1" title="Monitor scraping">
+                  <i class="fas fa-spinner fa-spin"></i>
+                </a>
+              {% elif s.status == 'sedang_analisis' %}
+                <a href="{{ url_for('monitoring_analisis') }}?session_id={{ s.id }}" class="btn btn-sm btn-outline-info me-1" title="Monitor analisis">
+                  <i class="fas fa-spinner fa-spin"></i>
+                </a>
+              {% elif s.status == 'selesai' %}
+                <a href="{{ url_for('detail_sesi', session_id=s.id) }}" class="btn btn-sm btn-outline-primary me-1" title="Lihat hasil analisis">
+                  <i class="fas fa-eye"></i>
+                </a>
+              {% elif s.jumlah_data %}
+                <a href="{{ url_for('detail_sesi', session_id=s.id) }}" class="btn btn-sm btn-outline-success me-1" title="Analisis sentimen {{ s.nama_bulan }} {{ s.tahun }}">
+                  <i class="fas fa-brain"></i>
+                </a>
+              {% endif %}
+              <button class="btn btn-sm btn-outline-danger"
+                      onclick="konfirmasiHapus({{ s.id }}, '{{ s.nama_bulan }} {{ s.tahun }}', '{{ s.cabang or '' }}')">
+                <i class="fas fa-trash"></i>
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="fas fa-database fa-3x mb-3 opacity-25"></i>
+      <p class="mb-0">Belum ada data. Klik <strong>Scraping Cabang</strong> untuk memulai.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal Konfirmasi Hapus -->
+<div class="modal fade" id="modalHapus" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-body text-center p-4">
+        <div class="mb-3">
+          <div class="rounded-circle bg-danger bg-opacity-10 d-inline-flex align-items-center justify-content-center"
+               style="width:64px;height:64px;">
+            <i class="fas fa-trash-alt fa-xl text-danger"></i>
+          </div>
+        </div>
+        <h5 class="fw-bold mb-1">Hapus Data Scraping?</h5>
+        <p class="text-muted mb-1" id="hapus-periode"></p>
+        <p class="text-muted small mb-4" id="hapus-cabang"></p>
+        <div class="alert alert-warning small py-2 mb-4">
+          <i class="fas fa-exclamation-triangle me-1"></i>
+          Semua ulasan dan hasil analisis pada sesi ini akan dihapus permanen.
+        </div>
+        <div class="d-flex gap-2 justify-content-center">
+          <button class="btn btn-secondary px-4" data-bs-dismiss="modal">Batal</button>
+          <form id="formHapus" method="POST">
+            <button type="submit" class="btn btn-danger px-4">
+              <i class="fas fa-trash me-2"></i>Ya, Hapus
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Konfirmasi Analisis -->
+<div class="modal fade" id="modalAnalisis" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-body text-center p-4">
+        <div class="mb-3">
+          <div class="rounded-circle bg-success bg-opacity-10 d-inline-flex align-items-center justify-content-center"
+               style="width:64px;height:64px;">
+            <i class="fas fa-brain fa-xl text-success"></i>
+          </div>
+        </div>
+        <h5 class="fw-bold mb-1">Analisis Sentimen?</h5>
+        <p class="fw-semibold text-dark mb-0" id="analisis-cabang"></p>
+        <p class="text-muted small mb-4" id="analisis-periode"></p>
+        <div class="d-flex gap-2 justify-content-center">
+          <button class="btn btn-secondary px-4" data-bs-dismiss="modal">Batal</button>
+          <button class="btn btn-success px-4" id="btn-konfirmasi-analisis">
+            <i class="fas fa-check me-2"></i>Ya
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{% if ada_running %}
+<script>
+  setTimeout(() => location.reload(), 10000);
+</script>
+{% endif %}
+<script>
+function mulaiAnalisis(btn) {
+  const sessionId = btn.dataset.sid;
+  const cabang    = btn.dataset.cabang;
+  const periode   = btn.dataset.periode;
+
+  document.getElementById('analisis-cabang').textContent = cabang;
+  document.getElementById('analisis-periode').textContent = periode;
+
+  const modal = new bootstrap.Modal(document.getElementById('modalAnalisis'));
+  modal.show();
+
+  document.getElementById('btn-konfirmasi-analisis').onclick = function() {
+    modal.hide();
+    fetch('/sesi/' + sessionId + '/analisis', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) window.location.href = '/analisis/monitoring?session_id=' + sessionId
+                    + '&cabang=' + encodeURIComponent(cabang)
+                    + '&periode=' + encodeURIComponent(periode);
+        else alert(d.pesan || 'Gagal memulai analisis.');
+      });
+  };
+}
+
+function konfirmasiHapus(sessionId, periode, cabang) {
+  document.getElementById('hapus-periode').textContent = periode;
+  document.getElementById('hapus-cabang').textContent  = cabang || '';
+  document.getElementById('formHapus').action = '/sesi/' + sessionId + '/hapus';
+  new bootstrap.Modal(document.getElementById('modalHapus')).show();
+}
+</script>
+{% endblock %}
